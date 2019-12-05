@@ -1,17 +1,149 @@
+#[macro_use]
+extern crate lazy_static;
+
 use std::collections::HashSet;
 type Piece = Vec<(i8, i8, char)>;
+
+const ID_LIGHTNING: u8 = 0;
+const ID_BIGT: u8 = 1;
+const ID_L: u8 = 2;
+const ID_BIGC: u8 = 3;
+const ID_WEIRDO: u8 = 4;
+const ID_SMALLT: u8 = 5;
+const ID_V: u8 = 6;
+const ID_PLUS: u8 = 7;
+const ID_LINE: u8 = 8;
+const ID_S: u8 = 9;
+const ID_HAMMER: u8 = 10;
+const ID_STAIRS: u8 = 11;
+const ID_GUN: u8 = 12;
+
+macro_rules! make_shape {
+    ($side1:expr, $side2:expr) => {
+        {
+            let side1 = rotations($side1);
+            let side2 = rotations($side2);
+            let mut patterns = Vec::new();
+            for x in side1.iter().chain(side2.iter()) {
+                let pattern = x.clone();
+                // pattern.sort();
+                if !patterns.contains(&pattern) {
+                    patterns.push(pattern);
+                }
+            }
+            patterns
+        }
+    }
+}
+
+lazy_static! {
+    // R.x   x.x
+    // . .   . .
+    static ref BIGC: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'R'), (1, 0, '.'), (2, 0, 'x'), (0, -1, '.'), (2, -1, '.')],
+            vec![]
+            // vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (0, -1, '.'), (2, -1, '.')]
+            );
+
+    // .x.  .S.
+    //  .    .
+    //  x    x
+    static ref BIGT: Vec<Piece> = make_shape!(
+            vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (1, -1, '.'), (1, -2, 'x')],
+            vec![(0, 0, '.'), (1, 0, 'S'), (2, 0, '.'), (1, -1, '.'), (1, -2, 'x')]);
+
+    // x        .
+    // .x.x  .x.x
+    static ref L: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'x'), (0, -1, '.'), (1, -1, 'x'), (2, -1, '.'), (3, -1, 'x')],
+            vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (3, 0, 'x'), (3, 1, '.')]);
+
+    // x       .
+    // .x.   x.x
+    //   x   .
+    static ref LIGHTNING: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'x'), (0, -1, '.'), (1, -1, 'x'), (2, -1, '.'), (2, -2, 'x')],
+            vec![(0, 0, '.'), (0, -1, 'x'), (-1, -1, '.'), (-2, -1, 'x'), (-2, -2, '.')]);
+
+    //  x    .
+    // x.x  .x.
+    // .      x
+    static ref WEIRDO: Vec<Piece> = make_shape!(
+            vec![(0, 0, '.'), (0, 1, 'x'), (1, 1, '.'), (2, 1, 'x'), (1, 2, 'x')],
+            vec![(0, 0, 'x'), (0, 1, '.'), (-1, 1, 'x'), (-2, 1, '.'), (-1, 2, '.')]);
+
+    // x.x  R.x
+    //  x    x
+    static ref SMALLT: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x')],
+            vec![(0, 0, 'R'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x')]);
+
+    // .x.  .x.
+    // x      D
+    // .      .
+    static ref V: Vec<Piece> = make_shape!(
+            vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (0, -1, 'x'), (0, -2, '.')],
+            vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (2, -1, 'D'), (2, -2, '.')]);
+
+    //  .    x
+    // .x.  x.x
+    //  .    x
+    static ref PLUS: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'x'), (1, 0, '.'), (0, 1, '.'), (0, -1, '.'), (-1, 0, '.')],
+            vec![(0, 0, '.'), (1, 0, 'x'), (0, 1, 'x'), (0, -1, 'x'), (-1, 0, 'x')]);
+
+    // x.x.x  x.x.E
+    static ref LINE: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (4, 0, 'x')],
+            vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (4, 0, 'E')]);
+
+    // .x.    x.x
+    //   x.  x.
+    static ref S: Vec<Piece> = make_shape!(
+            vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (2, -1, 'x'), (3, -1, '.')],
+            vec![(0, 0, 'x'), (-1, 0, '.'), (-2, 0, 'x'), (-2, -1, '.'), (-3, -1, 'x')]);
+
+    // x.x.   x.x.
+    //  x       .
+    static ref HAMMER: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (1, -1, 'x')],
+            vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (2, -1, '.')]);
+
+    // S.    .x
+    //  x.  .x
+    //   x  x
+    static ref STAIRS: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'S'), (1, 0, '.'), (1, -1, 'x'), (2, -1, '.'), (2, -2, 'x')],
+            // vec![(0, 0, 'x'), (-1, 0, '.'), (-1, -1, 'x'), (-2, -1, '.'), (-2, -2, 'x')]
+            vec![]
+            );
+
+    // D.x  .x.
+    //  x.  x.
+    static ref GUN: Vec<Piece> = make_shape!(
+            vec![(0, 0, 'D'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x'), (2, -1, '.')],
+            // vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (0, -1, 'x'), (1, -1, '.')]
+            vec![]
+            );
+}
 
 #[derive(Clone)]
 struct Board {
     board: [Option<char>; 64],
-    pieces: Vec<(Piece, (usize, usize))>
+
+    /// IDs of the pieces left to place on the board
+    pieces_left: HashSet<u8>,
+
+    /// ID of the Piece, index in the patterns array, (x, y) coord
+    pieces: Vec<(u8, usize, i8, i8)>
 }
 
 impl Board {
     pub fn new() -> Board {
         Board {
             board: [None; 64],
-            pieces: Vec::new()
+            pieces_left: (0..13).collect(),
+            pieces: vec![]
         }
     }
 
@@ -79,6 +211,7 @@ impl Board {
     }
 }
 
+/// Generate the possible rotations for a given piece
 fn rotations(piece: Piece) -> Vec<Piece> {
     let mut result = Vec::new();
     result.push(piece.clone());
@@ -92,172 +225,6 @@ fn rotations(piece: Piece) -> Vec<Piece> {
 }
 
 fn main() {
-    // 1      
-    // x        .
-    // .x.x  .x.x
-    let L1 = vec![(0, 0, 'x'), (0, -1, '.'), (1, -1, 'x'), (2, -1, '.'), (3, -1, 'x')];
-    let L1 = rotations(L1);
-    let L2 = vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (3, 0, 'x'), (3, 1, '.')];
-    let L2 = rotations(L2);
-    let mut L = HashSet::new();
-    for x in L1.iter().chain(L2.iter()) {
-        L.insert(x);
-    }
-
-
-    // 2
-    // x       .
-    // .x.   x.x
-    //   x   .
-    let lightning1 = vec![(0, 0, 'x'), (0, -1, '.'), (1, -1, 'x'), (2, -1, '.'), (2, -2, 'x')];
-    let lightning1 = rotations(lightning1);
-    let lightning2 = vec![(0, 0, '.'), (0, -1, 'x'), (-1, -1, '.'), (-2, -1, 'x'), (-2, -2, '.')];
-    let lightning2 = rotations(lightning2);
-    let mut lightning = HashSet::new();
-    for x in lightning1.iter().chain(lightning2.iter()) {
-        lightning.insert(x);
-    }
-
-    // 3
-    // .x.  .S.
-    //  .    .
-    //  x    x
-    let big_t1 = vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (1, -1, '.'), (1, -2, 'x')];
-    let big_t1 = rotations(big_t1);
-    let big_t2 = vec![(0, 0, '.'), (1, 0, 'S'), (2, 0, '.'), (1, -1, '.'), (1, -2, 'x')];
-    let big_t2 = rotations(big_t2);
-    let mut big_t = HashSet::new();
-    for x in big_t1.iter().chain(big_t2.iter()) {
-        big_t.insert(x);
-    }
-
-    // 4
-    //  x    .
-    // x.x  .x.
-    // .      x
-    let weirdo1 = vec![(0, 0, '.'), (0, 1, 'x'), (1, 1, '.'), (2, 1, 'x'), (1, 2, 'x')];
-    let weirdo1 = rotations(weirdo1);
-    let weirdo2 = vec![(0, 0, 'x'), (0, 1, '.'), (-1, 1, 'x'), (-2, 1, '.'), (-1, 2, '.')];
-    let weirdo2 = rotations(weirdo2);
-    let mut weirdo = HashSet::new();
-    for x in weirdo1.iter().chain(weirdo2.iter()) {
-        weirdo.insert(x);
-    }
-
-    // 5
-    // x.x  R.x
-    //  x    x
-    let small_t1 = vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x')];
-    let small_t1 = rotations(small_t1);
-    let small_t2 = vec![(0, 0, 'R'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x')];
-    let small_t2 = rotations(small_t2);
-    let mut small_t = HashSet::new();
-    for x in small_t1.iter().chain(small_t2.iter()) {
-        small_t.insert(x);
-    }
-
-    // 6
-    // .x.  .x.
-    // x      D
-    // .      .
-    let v1 = vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (0, -1, 'x'), (0, -2, '.')];
-    let v1 = rotations(v1);
-    let v2 = vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (2, -1, 'D'), (2, -2, '.')];
-    let v2 = rotations(v2);
-    let mut v = HashSet::new();
-    for x in v1.iter().chain(v2.iter()) {
-        v.insert(x);
-    }
-
-    // 7
-    //  .    x
-    // .x.  x.x
-    //  .    x
-    let plus1 = vec![(0, 0, 'x'), (1, 0, '.'), (0, 1, '.'), (0, -1, '.'), (-1, 0, '.')];
-    let plus1 = rotations(plus1);
-    let plus2 = vec![(0, 0, '.'), (1, 0, 'x'), (0, 1, 'x'), (0, -1, 'x'), (-1, 0, 'x')];
-    let plus2 = rotations(plus2);
-    let mut plus = HashSet::new();
-    for x in plus1.iter().chain(plus2.iter()) {
-        plus.insert(x);
-    }
-
-    // 8
-    // x.x.x  x.x.E
-    let line1 = vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (4, 0, 'x')];
-    let line1 = rotations(line1);
-    let line2 = vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (4, 0, 'E')];
-    let line2 = rotations(line2);
-    let mut line = HashSet::new();
-    for x in line1.iter().chain(line2.iter()) {
-        line.insert(x);
-    }
-
-
-    // 9
-    // .x.    x.x
-    //   x.  x.
-    let s1 = vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (2, -1, 'x'), (3, -1, '.')];
-    let s1 = rotations(s1);
-    let s2 = vec![(0, 0, 'x'), (-1, 0, '.'), (-2, 0, 'x'), (-2, -1, '.'), (-3, -1, 'x')];
-    let s2 = rotations(s2);
-    let mut s = HashSet::new();
-    for x in s1.iter().chain(s2.iter()) {
-        s.insert(x);
-    }
-
-    // 10
-    // x.x.   x.x.
-    //  x       .
-    let hammer1 = vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (1, -1, 'x')];
-    let hammer1 = rotations(hammer1);
-    let hammer2 = vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (2, -1, '.')];
-    let hammer2 = rotations(hammer2);
-    let mut hammer = HashSet::new();
-    for x in hammer1.iter().chain(hammer2.iter()) {
-        hammer.insert(x);
-    }
-
-    // 11
-    // R.x   x.x
-    // . .   . .
-    let big_c1 = vec![(0, 0, 'R'), (1, 0, '.'), (2, 0, 'x'), (0, -1, '.'), (2, -1, '.')];
-    // let big_c1 = vec![(0, 0, 'R'), (1, 0, '1'), (2, 0, '2'), (0, -1, '3'), (2, -1, '4')];
-    let big_c1 = rotations(big_c1);
-
-    // let big_c2 = vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (0, -1, '.'), (2, -1, '.')];
-    let big_c2 = vec![];
-    let big_c2 = rotations(big_c2);
-    let mut big_c = HashSet::new();
-    for x in big_c1.iter().chain(big_c2.iter()) {
-        big_c.insert(x);
-    }
-
-    // 12
-    // S.    .x
-    //  x.  .x
-    //   x  x
-    let stairs1 = vec![(0, 0, 'S'), (1, 0, '.'), (1, -1, 'x'), (2, -1, '.'), (2, -2, 'x')];
-    let stairs1 = rotations(stairs1);
-    let stairs2 = vec![(0, 0, 'x'), (-1, 0, '.'), (-1, -1, 'x'), (-2, -1, '.'), (-2, -2, 'x')];
-    let stairs2 = rotations(stairs2);
-    let mut stairs = HashSet::new();
-    for x in stairs1.iter().chain(stairs2.iter()) {
-        stairs.insert(x);
-    }
-
-    // 13
-    // D.x  .x.
-    //  x.  x.
-    let gun1 = vec![(0, 0, 'D'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x'), (2, -1, '.')];
-    let gun1 = rotations(gun1);
-    let gun2 = vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (0, -1, 'x'), (1, -1, '.')];
-    let gun2 = rotations(gun2);
-    let mut gun = HashSet::new();
-    for x in gun1.iter().chain(gun2.iter()) {
-        gun.insert(x);
-    }
-
     let solution_board = 
       [Some('x'),Some('.'),Some('D'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),
        Some('.'),Some('E'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),
@@ -270,32 +237,59 @@ fn main() {
 
     let solution = Board {
         board: solution_board,
-        pieces: Vec::new()
+        pieces: Vec::new(),
+        pieces_left: HashSet::new()
+
     };
     solution.print();
 
     let mut possibles = vec![Board::new()];
+    'next_board: loop {
+        print!("{}\n", possibles.len());
+        let board = possibles.pop().expect("No possibles?!");
+        for piece_id in &board.pieces_left {
+            for y in 0..8 {
+                for x in 0..8 {
+                    let patterns: &Vec<Piece> = match piece_id {
+                        &ID_BIGC => &BIGC,
+                        &ID_BIGT => &BIGT,
+                        &ID_L => &L,
+                        &ID_LIGHTNING => &LIGHTNING,
+                        &ID_WEIRDO => &WEIRDO,
+                        &ID_SMALLT => &SMALLT,
+                        &ID_V => &V,
+                        &ID_PLUS => &PLUS,
+                        &ID_LINE => &LINE,
+                        &ID_S => &S,
+                        &ID_HAMMER => &HAMMER,
+                        &ID_STAIRS => &STAIRS,
+                        &ID_GUN => &GUN,
+                        _ => unreachable!()
+                    };
 
-    let board = possibles.pop().unwrap();
+                    for (i, piece) in patterns.iter().enumerate() {
+                        if piece.len() == 0 {
+                            continue;
+                        }
 
-    for y in 0..8 {
-        for x in 0..8 {
-            for piece in &big_c {
-                if piece.len() == 0 {
-                    continue;
-                }
-                let mut curr_board = board.clone();
-                if curr_board.place_piece(x, y, piece) {
-                    if curr_board.check_solution(&solution) {
-                        possibles.push(curr_board);
+                        let mut curr_board = board.clone();
+                        if curr_board.place_piece(x, y, piece) {
+                            if curr_board.check_solution(&solution) {
+                                curr_board.pieces_left.remove(&piece_id);
+                                curr_board.pieces.push((*piece_id, i, x, y));
+                                if curr_board.pieces_left.len() == 0 {
+                                    print!("FOUND\n");
+                                    curr_board.print();
+                                    loop {}
+                                }
+                                possibles.push(curr_board);
+                                // continue 'next_board;
+                            }
+                        }
                     }
                 }
             }
         }
     }
-
-    for p in possibles {
-        print!("-------\n");
-        p.print();
-    }
 }
+
