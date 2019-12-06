@@ -2,6 +2,9 @@
 extern crate lazy_static;
 
 use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
+use std::thread;
+
 type Piece = Vec<(i8, i8, char)>;
 
 const ID_LIGHTNING: u8 = 0;
@@ -25,6 +28,9 @@ macro_rules! make_shape {
             let side2 = rotations($side2);
             let mut patterns = Vec::new();
             for x in side1.iter().chain(side2.iter()) {
+                if x.len() == 0 {
+                    continue; 
+                }
                 let pattern = x.clone();
                 // pattern.sort();
                 if !patterns.contains(&pattern) {
@@ -50,7 +56,9 @@ lazy_static! {
     //  x    x
     static ref BIGT: Vec<Piece> = make_shape!(
             vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (1, -1, '.'), (1, -2, 'x')],
-            vec![(0, 0, '.'), (1, 0, 'S'), (2, 0, '.'), (1, -1, '.'), (1, -2, 'x')]);
+            // vec![(0, 0, '.'), (1, 0, 'S'), (2, 0, '.'), (1, -1, '.'), (1, -2, 'x')],
+            vec![]
+            );
 
     // x        .
     // .x.x  .x.x
@@ -76,14 +84,18 @@ lazy_static! {
     //  x    x
     static ref SMALLT: Vec<Piece> = make_shape!(
             vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x')],
-            vec![(0, 0, 'R'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x')]);
+            // vec![(0, 0, 'R'), (1, 0, '.'), (2, 0, 'x'), (1, -1, 'x')]
+            vec![]
+            );
 
     // .x.  .x.
     // x      D
     // .      .
     static ref V: Vec<Piece> = make_shape!(
             vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (0, -1, 'x'), (0, -2, '.')],
-            vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (2, -1, 'D'), (2, -2, '.')]);
+            // vec![(0, 0, '.'), (1, 0, 'x'), (2, 0, '.'), (2, -1, 'D'), (2, -2, '.')]
+            vec![]
+            );
 
     //  .    x
     // .x.  x.x
@@ -95,7 +107,9 @@ lazy_static! {
     // x.x.x  x.x.E
     static ref LINE: Vec<Piece> = make_shape!(
             vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (4, 0, 'x')],
-            vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (4, 0, 'E')]);
+            // vec![(0, 0, 'x'), (1, 0, '.'), (2, 0, 'x'), (3, 0, '.'), (4, 0, 'E')]
+            vec![]
+            );
 
     // .x.    x.x
     //   x.  x.
@@ -209,6 +223,74 @@ impl Board {
 
         return true;
     }
+
+    pub fn get_none_neighbors(&self, x: usize, y: usize) -> Vec<(usize, usize)> {
+        let index = x as usize * 8 + y as usize;
+        if self.board[index].is_some() { return Vec::new(); }
+        
+        let mut none_neighbors = Vec::new();
+        if x > 0 {
+            let left_index = (x-1) as usize * 8 + y as usize;
+            if self.board[left_index].is_none() { none_neighbors.push((x-1, y)); }
+        }
+        if x < 7 {
+            let right_index = (x+1) as usize * 8 + y as usize;
+            if self.board[right_index].is_none() { none_neighbors.push((x+1, y)); }
+        }
+        if y > 0 {
+            let up_index = x as usize * 8 + (y-1) as usize;
+            if self.board[up_index].is_none() { none_neighbors.push((x, y-1)); }
+        }
+        if y < 7 {
+            let down_index = x as usize * 8 + (y+1) as usize;
+            if self.board[down_index].is_none() { none_neighbors.push((x, y+1)); }
+        }
+
+        none_neighbors
+    }
+
+    pub fn has_pockets(&mut self) -> bool {
+        for y in 0..8 {
+            for x in 0..8 {
+                let index = x as usize * 8 + y as usize;
+                if self.board[index].is_some() { continue; }
+
+                let none_neighbors = self.get_none_neighbors(x, y);
+                if none_neighbors.len() == 0 {
+                    // Found single square pocket
+                    return true;
+                }
+
+                if none_neighbors.len() == 1 {
+                    let (other_x, other_y) = none_neighbors[0];
+                    let other_none_neighbors = self.get_none_neighbors(other_x, other_y);
+                    if other_none_neighbors.len() == 1 {
+                        // Found double square pocket
+                        return true;
+                    }
+                }
+
+                if none_neighbors.len() == 2 {
+                    let (other_x1, other_y1) = none_neighbors[0];
+                    let other_none_neighbors = self.get_none_neighbors(other_x1, other_y1);
+                    if other_none_neighbors.len() != 1 {
+                        continue;
+                    }
+
+                    let (other_x2, other_y2) = none_neighbors[1];
+                    let other_none_neighbors = self.get_none_neighbors(other_x2, other_y2);
+                    if other_none_neighbors.len() != 1 {
+                        continue;
+                    }
+
+                    // Found triple pocket
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
 }
 
 /// Generate the possible rotations for a given piece
@@ -225,71 +307,131 @@ fn rotations(piece: Piece) -> Vec<Piece> {
 }
 
 fn main() {
-    let solution_board = 
-      [Some('x'),Some('.'),Some('D'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),
-       Some('.'),Some('E'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),
-       Some('R'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),  
-       Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'), 
-       Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),  
-       Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'), 
-       Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),
-       Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x')];
+    let possibles = Arc::new(Mutex::new(vec![Board::new()]));
 
-    let solution = Board {
-        board: solution_board,
-        pieces: Vec::new(),
-        pieces_left: HashSet::new()
+    let num_cores = 12;
+    for _ in 0..num_cores {
+        let possibles = possibles.clone();
+        thread::spawn(move || {
+            let solution_board = 
+            [Some('x'),Some('.'),Some('D'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),
+             Some('.'),Some('S'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),
+             Some('R'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),  
+             Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'), 
+             Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),  
+             Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'), 
+             Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),
+             Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x'),Some('.'),Some('x')];
 
-    };
-    solution.print();
+            let solution = Board {
+                board: solution_board,
+                pieces: Vec::new(),
+                pieces_left: HashSet::new()
 
-    let mut possibles = vec![Board::new()];
-    'next_board: loop {
-        print!("{}\n", possibles.len());
-        let board = possibles.pop().expect("No possibles?!");
-        for piece_id in &board.pieces_left {
-            for y in 0..8 {
-                for x in 0..8 {
-                    let patterns: &Vec<Piece> = match piece_id {
-                        &ID_BIGC => &BIGC,
-                        &ID_BIGT => &BIGT,
-                        &ID_L => &L,
-                        &ID_LIGHTNING => &LIGHTNING,
-                        &ID_WEIRDO => &WEIRDO,
-                        &ID_SMALLT => &SMALLT,
-                        &ID_V => &V,
-                        &ID_PLUS => &PLUS,
-                        &ID_LINE => &LINE,
-                        &ID_S => &S,
-                        &ID_HAMMER => &HAMMER,
-                        &ID_STAIRS => &STAIRS,
-                        &ID_GUN => &GUN,
-                        _ => unreachable!()
-                    };
+            };
 
-                    for (i, piece) in patterns.iter().enumerate() {
-                        if piece.len() == 0 {
-                            continue;
-                        }
-
-                        let mut curr_board = board.clone();
-                        if curr_board.place_piece(x, y, piece) {
-                            if curr_board.check_solution(&solution) {
-                                curr_board.pieces_left.remove(&piece_id);
-                                curr_board.pieces.push((*piece_id, i, x, y));
-                                if curr_board.pieces_left.len() == 0 {
-                                    print!("FOUND\n");
-                                    curr_board.print();
-                                    loop {}
-                                }
-                                possibles.push(curr_board);
-                                // continue 'next_board;
+            loop {
+                let board = possibles.lock().unwrap().pop().expect("No possibles?!");
+                for piece_id in &board.pieces_left {
+                    'next_row: for x in (0..8).rev() {
+                        for y in 0..8 {
+                            let index = x as usize * 8 + y as usize;
+                            if board.board[index].is_some() {
+                                continue;
                             }
+
+                            let patterns: &Vec<Piece> = match piece_id {
+                                &ID_BIGC => &BIGC,
+                                &ID_BIGT => &BIGT,
+                                &ID_L => &L,
+                                &ID_LIGHTNING => &LIGHTNING,
+                                &ID_WEIRDO => &WEIRDO,
+                                &ID_SMALLT => &SMALLT,
+                                &ID_V => &V,
+                                &ID_PLUS => &PLUS,
+                                &ID_LINE => &LINE,
+                                &ID_S => &S,
+                                &ID_HAMMER => &HAMMER,
+                                &ID_STAIRS => &STAIRS,
+                                &ID_GUN => &GUN,
+                                _ => unreachable!()
+                            };
+
+                            for (i, piece) in patterns.iter().enumerate() {
+                                if piece.len() == 0 {
+                                    continue;
+                                }
+
+                                let mut curr_board = board.clone();
+                                if curr_board.place_piece(x, y, piece) {
+                                    if curr_board.check_solution(&solution) && 
+                                        !curr_board.has_pockets() {
+                                        curr_board.pieces_left.remove(&piece_id);
+                                        curr_board.pieces.push((*piece_id, i, x, y));
+                                        if curr_board.pieces_left.len() == 0 {
+                                            for _ in 0..6 {
+                                                print!("FOUND\n");
+                                            }
+                                            curr_board.print();
+                                            print!("solution\n");
+                                            let mut solved = Board::new();
+                                            for (i, &(id, index, x, y)) in curr_board.pieces.iter().enumerate() {
+                                                let patterns: &Vec<Piece> = match id {
+                                                    ID_BIGC => &BIGC,
+                                                    ID_BIGT => &BIGT,
+                                                    ID_L => &L,
+                                                    ID_LIGHTNING => &LIGHTNING,
+                                                    ID_WEIRDO => &WEIRDO,
+                                                    ID_SMALLT => &SMALLT,
+                                                    ID_V => &V,
+                                                    ID_PLUS => &PLUS,
+                                                    ID_LINE => &LINE,
+                                                    ID_S => &S,
+                                                    ID_HAMMER => &HAMMER,
+                                                    ID_STAIRS => &STAIRS,
+                                                    ID_GUN => &GUN,
+                                                    _ => unreachable!()
+                                                };
+                                                solved.place_piece(x, y, &patterns[index]);
+                                                print!("{}:\n", i);
+                                                solved.print();
+                                            }
+
+                                            for _ in 0..6 {
+                                                print!("DONE\n");
+                                            }
+                                            loop {}
+                                        }
+
+                                        possibles.lock().unwrap().push(curr_board);
+                                    }
+                                }
+                            }
+
+                            // We only want to try the next available empty space, not
+                            // every empty space
+                            continue 'next_row;
                         }
                     }
                 }
             }
+        });
+    }
+
+    let mut start = std::time::Instant::now();
+    loop {
+        if start.elapsed().as_secs() > 600 {
+            let mut possibles = possibles.lock().unwrap();
+            possibles.sort_by(|a, b| b.pieces_left.len().partial_cmp(&a.pieces_left.len()).unwrap());
+            print!("{}\n", possibles.len());
+            let curr = possibles.pop().unwrap();
+            curr.print();
+            print!("{:?}\n", curr.pieces_left);
+            possibles.push(curr);
+            possibles.sort_by(|a, b| b.pieces_left.len().partial_cmp(&a.pieces_left.len()).unwrap());
+            start = std::time::Instant::now();
         }
     }
 }
+
 
